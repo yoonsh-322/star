@@ -1,0 +1,6 @@
+{
+  "name": "STAR 자소서 번역 챗봇",
+  "description": "취업 준비생의 일상과 알바 경험을 STAR 기법(상황-과제-행동-결과)의 전문 자기소개서와 맞춤 직무 키워드로 변환해 주는 AI 코치",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

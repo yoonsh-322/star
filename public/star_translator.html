@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STAR 자소서 번역 챗봇 - 일상을 합격 자기소개서로</title>
+  <meta name="description" content="취업 준비생의 일상과 알바 경험을 STAR 기법(상황-과제-행동-결과)의 전문 자기소개서와 맞춤 직무 키워드로 변환해 주는 AI 코치" />
+  
+  <!-- Pretendard Korean Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard Variable', 'Pretendard', '-apple-system', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- React 18 & ReactDOM & Babel Standalone -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased selection:bg-indigo-100 selection:text-indigo-900">
+  <div id="root"></div>
+
+  <!-- React App in Single File -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const PRESET_STORIES = [
+      {
+        icon: '☕',
+        title: '카페 알바 컴플레인 응대',
+        text: '오늘 카페 점심 피크타임에 주문이 엄청 밀렸는데 한 손님이 커피가 너무 미지근하고 늦게 나왔다고 언성을 높였다. 우선 당황하지 않고 진심으로 죄송하다고 사과드린 뒤, 주문서를 재확인해서 스팀 온도를 세심하게 맞춰 3분 만에 다시 만들어드렸다. 기다리시는 동안 드실 수 있는 미니 쿠키도 서비스로 챙겨드렸다. 손님이 나가실 때 오히려 화내서 미안하다며 고맙다고 하셨고, 사장님께도 피크타임용 주문 번호표 동선을 개선하자고 제안드렸다.',
+      },
+      {
+        icon: '🏪',
+        title: '편의점 유통기한 폐기율 절감',
+        text: '편의점 야간 알바를 하는데 매주 삼각김밥과 샌드위치 폐기가 20개 이상씩 나와서 사장님 손해가 커 보였다. 손님들이 보통 진열대 깊은 곳이나 눈높이 위치만 집어가는 것을 발견하고, 유통기한 임박 상품을 계산대 바로 앞 눈에 띄는 "오늘의 추천 타임세일존"으로 재배치했다. 사장님께 말씀드려 폐기 3시간 전 20% 할인 태그를 붙여 팔았더니 폐기율이 기존 대비 거의 절반으로 줄었고, 사장님께 보너스 시급도 받았다.',
+      },
+      {
+        icon: '💻',
+        title: '반복 엑셀 업무 3시간→30분 단축',
+        text: '방학 동안 사무 보조 알바를 했는데 매주 각 지점별 매출 데이터를 수기로 하나하나 취합해서 엑셀 보고서를 만드느라 3시간 넘게 걸렸다. 매번 오타도 나고 비효율적인 것 같아서 주말에 유튜브로 엑셀 VLOOKUP과 피벗테이블, 간단한 매크로를 독학했다. 지점별 파일만 넣으면 자동으로 합산되는 템플릿을 만들어 팀에 공유했더니 매주 3시간 걸리던 단순 반복 작업이 30분으로 줄어 팀장님께 큰 칭찬을 받았다.',
+      },
+      {
+        icon: '👥',
+        title: '조별과제 무임승차 갈등 조율',
+        text: '전공 팀 프로젝트에서 4명 중 1명이 중간고사 이후 연락이 두절되고 자료 조사를 하나도 해오지 않았다. 다른 팀원들이 격분해서 이름에서 빼버리자고 했지만, 내가 먼저 개인적으로 연락해 전화를 걸어 사정을 들어봤다. 알고 보니 복수전공이라 과제 양이 과도해 포기 상태였던 것이었다. 그래서 과제 분량을 난이도별로 다시 쪼개어, 그 팀원에게는 디자인 및 PPT 템플릿 제작 역할을 부여해 참여를 유도했다. 결과적으로 팀원 모두가 만족하며 A+ 학점을 받았다.',
+      },
+    ];
+
+    const TARGET_JOBS = [
+      '전체 / 일반 (공통역량)',
+      '기획 / 마케팅',
+      '영업 / 고객서비스(CS)',
+      'IT / 소프트웨어 개발',
+      '경영지원 / 인사 / 총무',
+      '유통 / 물류 / 생산관리',
+    ];
+
+    const TONES = [
+      '신입 공채 표준체 (~습니다, 정중한 어조)',
+      '주도적 실행·성과형 (문제해결 및 역량 강조)',
+      '협업·소통형 (팀워크와 배려 강조)',
+    ];
+
+    const INITIAL_WELCOME_MESSAGE = {
+      id: 'welcome-msg',
+      role: 'assistant',
+      content: '안녕하세요, 취업 준비생 여러분! 🎓\\n저는 여러분의 소소한 하루 일상이나 아르바이트 경험을 합격 자기소개서로 번역해 드리는 **STAR 자소서 번역 챗봇**입니다.\\n\\n카페, 편의점, 음식점, 물류, 사무보조 알바부터 조별과제, 동아리까지 오늘 겪은 일이나 기억에 남는 경험을 일기 쓰듯 편하게 말씀해 주세요!\\n\\n기업 채용 담당자가 가장 선호하는 **STAR 기법(상황-과제-행동-결과)**의 전문적인 자기소개서 문단과, 서류에 바로 엮어 쓸 수 있는 **핵심 직무 키워드 1~2가지**를 추천해 드릴게요. ✨',
+      timestamp: Date.now(),
+    };
+
+    const STORAGE_KEY = 'star_cover_letter_drafts_v1';
+
+    function App() {
+      const [messages, setMessages] = useState(() => [INITIAL_WELCOME_MESSAGE]);
+      const [savedDrafts, setSavedDrafts] = useState(() => {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          return stored ? JSON.parse(stored) : [];
+        } catch {
+          return [];
+        }
+      });
+      const [isLoading, setIsLoading] = useState(false);
+      const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
+      const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+      const [errorMessage, setErrorMessage] = useState(null);
+
+      // Input state
+      const [inputText, setInputText] = useState('');
+      const [targetJob, setTargetJob] = useState(TARGET_JOBS[0]);
+      const [tone, setTone] = useState(TONES[0]);
+      const [showOptions, setShowOptions] = useState(false);
+      const textareaRef = useRef(null);
+      const messagesEndRef = useRef(null);
+
+      useEffect(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedDrafts));
+        } catch (e) {
+          console.error(e);
+        }
+      }, [savedDrafts]);
+
+      useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }, [messages, isLoading]);
+
+      const handleSendMessage = async (textToSend, customJob = targetJob, customTone = tone) => {
+        const queryText = (textToSend || inputText).trim();
+        if (!queryText || isLoading) return;
+
+        setErrorMessage(null);
+        const userMsg = {
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content: queryText,
+          timestamp: Date.now(),
+        };
+
+        setMessages((prev) => [...prev, userMsg]);
+        setInputText('');
+        setIsLoading(true);
+
+        try {
+          const historyContext = messages
+            .filter((m) => m.id !== 'welcome-msg')
+            .slice(-6)
+            .map((m) => ({
+              role: m.role,
+              content: m.translation ? m.translation.replyText : m.content,
+            }));
+
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: queryText,
+              history: historyContext,
+              targetJob: customJob,
+              tone: customTone,
+            }),
+          });
+
+          const json = await res.json();
+          if (!res.ok || !json.success) {
+            throw new Error(json.error || '번역 중 오류가 발생했습니다.');
+          }
+
+          const botMsg = {
+            id: `bot-${Date.now()}`,
+            role: 'assistant',
+            content: json.data.replyText,
+            translation: json.data,
+            timestamp: Date.now(),
+          };
+
+          setMessages((prev) => [...prev, botMsg]);
+        } catch (err) {
+          setErrorMessage(err.message || '서버 통신 실패');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const handleSaveTranslation = (msg) => {
+        if (!msg || !msg.translation) return;
+        const newDraft = {
+          id: `draft-${Date.now()}`,
+          headline: msg.translation.headline,
+          star: msg.translation.star,
+          fullParagraph: msg.translation.fullParagraph,
+          keywords: msg.translation.keywords,
+          savedAt: Date.now(),
+        };
+        setSavedDrafts((prev) => [newDraft, ...prev]);
+      };
+
+      const handleDeleteDraft = (id) => {
+        setSavedDrafts((prev) => prev.filter((d) => d.id !== id));
+      };
+
+      const handleExportAll = () => {
+        if (savedDrafts.length === 0) return;
+        const content = savedDrafts
+          .map(
+            (d, idx) =>
+              `==========================================\\n[자소서 #${idx + 1}] ${d.headline}\\n작성일: ${new Date(d.savedAt).toLocaleDateString()}\\n\\n[완성본]\\n${d.fullParagraph}\\n\\n[STAR 분석]\\n- 상황 (S): ${d.star.situation}\\n- 과제 (T): ${d.star.task}\\n- 행동 (A): ${d.star.action}\\n- 결과 (R): ${d.star.result}\\n\\n[직무 키워드]\\n${d.keywords.map((k) => `- ${k.keyword}: ${k.howToUse}`).join('\\n')}\\n==========================================\\n`
+          )
+          .join('\\n\\n');
+
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `STAR_자소서_모음집_${new Date().toISOString().slice(0, 10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const savedHeadlines = new Set(savedDrafts.map((d) => d.headline));
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
+          {/* Header */}
+          <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 lg:px-8 py-3.5 shadow-xs">
+            <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 font-bold text-lg">
+                  ✨
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="font-bold text-slate-900 text-lg leading-tight tracking-tight">
+                      자소서 번역 챗봇
+                    </h1>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                      STAR 기법 AI 코치
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 hidden sm:block">
+                    소소한 일상과 알바 일기를 서류 합격 자기소개서 문단으로 번역합니다
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsGuideModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
+                >
+                  <span>📖</span>
+                  <span className="hidden sm:inline">STAR 가이드</span>
+                </button>
+
+                <button
+                  onClick={() => setIsSavedModalOpen(true)}
+                  className="relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/60 rounded-lg transition-colors border border-slate-200"
+                >
+                  <span>🔖</span>
+                  <span>내 보관함</span>
+                  {savedDrafts.length > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-indigo-600 text-white">
+                      {savedDrafts.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (confirm('대화를 초기화할까요?')) {
+                      setMessages([INITIAL_WELCOME_MESSAGE]);
+                    }
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="초기화"
+                >
+                  🔄
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Chat Stream */}
+          <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-4 sm:py-6">
+            <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-sky-500/10 to-indigo-500/5 border border-indigo-200/60 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm text-lg">
+                  💬
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-bold text-slate-800">
+                    &quot;오늘 하루 어떤 경험을 하셨나요?&quot;
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    아무리 사소해 보이는 일도 채용 담당자에게는 소중한 문제해결 역량이 됩니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsGuideModalOpen(true)}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 shrink-0 underline hidden sm:block"
+              >
+                STAR 팁 보기
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {messages.map((message) => {
+                const isUser = message.role === 'user';
+                const isSaved = message.translation && savedHeadlines.has(message.translation.headline);
+
+                if (isUser) {
+                  return (
+                    <div key={message.id} className="flex justify-end gap-2.5 max-w-4xl mx-auto my-3">
+                      <div className="flex flex-col items-end max-w-[85%] sm:max-w-[75%]">
+                        <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-xs px-4 py-3 shadow-xs text-sm leading-relaxed whitespace-pre-wrap">
+                          {message.content}
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 px-1">
+                          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 mt-0.5 border border-indigo-200">
+                        👤
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Assistant card
+                return (
+                  <div key={message.id} className="flex gap-2.5 max-w-4xl mx-auto my-4">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-sky-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                      🤖
+                    </div>
+
+                    <div className="flex-1 min-w-0 max-w-[92%] sm:max-w-[88%] space-y-2">
+                      {message.translation ? (
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-all">
+                          {/* Coach commentary */}
+                          <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-white px-5 py-3.5 border-b border-indigo-100 flex items-start gap-3">
+                            <span className="text-lg">💡</span>
+                            <div>
+                              <div className="text-xs font-semibold text-indigo-900 mb-0.5">자소서 코치의 응원 한마디</div>
+                              <p className="text-xs sm:text-sm text-indigo-950 font-medium leading-relaxed">{message.translation.coachMessage}</p>
+                            </div>
+                          </div>
+
+                          <div className="p-5 sm:p-6 space-y-6">
+                            {/* Headline & Save Action */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                              <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md inline-block mb-1.5">
+                                  추천 소제목
+                                </span>
+                                <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                                  {message.translation.headline}
+                                </h3>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                <button
+                                  onClick={() => handleSaveTranslation(message)}
+                                  disabled={isSaved}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                    isSaved
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : 'bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200'
+                                  }`}
+                                >
+                                  <span>{isSaved ? '✅ 저장됨' : '🔖 보관함 저장'}</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${message.translation.headline}\\n\\n${message.translation.fullParagraph}`);
+                                    alert('소제목과 자기소개서 본문이 복사되었습니다!');
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs"
+                                >
+                                  <span>📋 자소서 복사</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Full Finished Paragraph */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                                  자기소개서 완성 문단
+                                </span>
+                                <div className="text-[11px] text-slate-500 font-medium">
+                                  공백포함 <strong>{message.translation.fullParagraph.length}</strong>자 / 공백제외{' '}
+                                  <strong>{message.translation.fullParagraph.replace(/\\s/g, '').length}</strong>자
+                                </div>
+                              </div>
+                              <p className="text-sm sm:text-[15px] leading-relaxed text-slate-800 whitespace-pre-wrap">
+                                {message.translation.fullParagraph}
+                              </p>
+                            </div>
+
+                            {/* STAR Breakdown */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                              <div className="p-3.5 rounded-lg bg-sky-50 border border-sky-100 text-xs sm:text-sm">
+                                <div className="font-bold text-sky-800 mb-1">🟦 S 상황 (Situation)</div>
+                                <p className="text-slate-700 leading-relaxed text-xs sm:text-[13px]">{message.translation.star.situation}</p>
+                              </div>
+                              <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-100 text-xs sm:text-sm">
+                                <div className="font-bold text-amber-800 mb-1">🟧 T 과제/문제 (Task)</div>
+                                <p className="text-slate-700 leading-relaxed text-xs sm:text-[13px]">{message.translation.star.task}</p>
+                              </div>
+                              <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-100 text-xs sm:text-sm">
+                                <div className="font-bold text-emerald-800 mb-1">🟩 A 주도적 행동 (Action)</div>
+                                <p className="text-slate-700 leading-relaxed text-xs sm:text-[13px]">{message.translation.star.action}</p>
+                              </div>
+                              <div className="p-3.5 rounded-lg bg-purple-50 border border-purple-100 text-xs sm:text-sm">
+                                <div className="font-bold text-purple-800 mb-1">🟪 R 결과/성과 (Result)</div>
+                                <p className="text-slate-700 leading-relaxed text-xs sm:text-[13px]">{message.translation.star.result}</p>
+                              </div>
+                            </div>
+
+                            {/* Recommended Job Keywords */}
+                            <div className="bg-gradient-to-br from-indigo-50 to-slate-50 border border-indigo-100 rounded-xl p-4 sm:p-5">
+                              <h4 className="text-xs sm:text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                                <span>🏷️</span>
+                                <span>추천 직무 역량 키워드 & 자소서 작성 팁</span>
+                              </h4>
+                              <div className="space-y-2.5">
+                                {message.translation.keywords.map((kw, i) => (
+                                  <div key={i} className="bg-white p-3 rounded-lg border border-indigo-100 flex flex-col sm:flex-row sm:items-start gap-2.5">
+                                    <span className="px-2.5 py-1 rounded-md bg-indigo-600 text-white text-xs font-bold shrink-0 self-start">
+                                      #{kw.keyword}
+                                    </span>
+                                    <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed">
+                                      💡 {kw.howToUse}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Refine Prompts */}
+                            <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-1.5">
+                              <button
+                                onClick={() => handleSendMessage('성과와 수치를 조금 더 전문적으로 강조해 줘')}
+                                className="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 border border-slate-200"
+                              >
+                                📊 수치·성과 더 강조
+                              </button>
+                              <button
+                                onClick={() => handleSendMessage('500자 이내로 핵심만 간결하게 압축해 줘')}
+                                className="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 border border-slate-200"
+                              >
+                                ✂️ 500자 이내로 축약
+                              </button>
+                              <button
+                                onClick={() => handleSendMessage('팀원과의 협업과 소통 역량을 중심으로 문단을 다시 다듬어 줘')}
+                                className="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 border border-slate-200"
+                              >
+                                🤝 협업·소통 중심 재작성
+                              </button>
+                              <button
+                                onClick={() => handleSendMessage('이 경험을 바탕으로 실제 면접관이 물어볼 면접 질문 2가지와 답변 팁을 알려줘')}
+                                className="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 border border-slate-200"
+                              >
+                                ❓ 면접 예상 질문 보기
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">
+                          {message.content}
+                        </div>
+                      )}
+                      <span className="text-[10px] text-slate-400 block px-1">
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {isLoading && (
+                <div className="flex gap-2.5 max-w-4xl mx-auto my-4">
+                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                    ⏳
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs font-semibold text-indigo-700">
+                    경험을 STAR 기법과 직무 키워드로 번역하고 있어요...
+                  </div>
+                </div>
+              )}
+
+              {errorMessage && (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm">
+                  ⚠️ {errorMessage}
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </main>
+
+          {/* Bottom Chat Input Form */}
+          <div className="sticky bottom-0 z-20 bg-gradient-to-t from-slate-100 via-slate-50 to-slate-50/70 pt-3 pb-4 sm:pb-6 px-3 sm:px-6">
+            <div className="max-w-4xl mx-auto space-y-2.5">
+              {/* Presets */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                <span className="text-[11px] font-bold text-slate-500 shrink-0">💡 예시 경험:</span>
+                {PRESET_STORIES.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setInputText(preset.text);
+                      if (textareaRef.current) textareaRef.current.focus();
+                    }}
+                    className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200 text-xs font-medium transition-all"
+                  >
+                    <span>{preset.icon}</span>
+                    <span>{preset.title}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Text Input Card */}
+              <div className="bg-white rounded-2xl border border-slate-300 shadow-md p-3 sm:p-4">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setShowOptions(!showOptions)}
+                    className="flex items-center gap-1.5 text-slate-600 hover:text-indigo-600 font-medium py-0.5"
+                  >
+                    <span>⚙️</span>
+                    <span>조건 맞춤 설정 ({targetJob.split(' ')[0]} / {tone.split(' ')[0]})</span>
+                  </button>
+                  <span className="text-[11px] text-slate-400 hidden sm:inline">Enter 전송 | Shift+Enter 줄바꿈</span>
+                </div>
+
+                {showOptions && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">지원 희망 직무</label>
+                      <select
+                        value={targetJob}
+                        onChange={(e) => setTargetJob(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800"
+                      >
+                        {TARGET_JOBS.map((j) => (
+                          <option key={j} value={j}>{j}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">서술 어조</label>
+                      <select
+                        value={tone}
+                        onChange={(e) => setTone(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800"
+                      >
+                        {TONES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-end gap-2">
+                  <textarea
+                    ref={textareaRef}
+                    rows={2}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="오늘 있었던 일이나 알바 경험을 편하게 일기처럼 적어보세요..."
+                    className="w-full resize-none border-none p-1 text-sm text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none leading-relaxed"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage()}
+                    disabled={!inputText.trim() || isLoading}
+                    className={`p-2.5 sm:px-4 sm:py-2 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                      !inputText.trim() || isLoading
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+                    }`}
+                  >
+                    <span>{isLoading ? '번역 중...' : '번역하기 🚀'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Guide Modal */}
+          {isGuideModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+              <div className="bg-white w-full max-w-xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                  <h2 className="font-bold text-slate-900 text-base">STAR 기법 작성 가이드</h2>
+                  <button onClick={() => setIsGuideModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+                <div className="p-6 overflow-y-auto space-y-4 text-xs sm:text-sm text-slate-700">
+                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-950 font-medium">
+                    💡 STAR 기법은 대기업/공기업 채용 담당자가 지원자의 역량을 객관적으로 평가하기 위해 사용하는 4단계 구조화 기법입니다.
+                  </div>
+                  <div className="space-y-2">
+                    <div className="p-3 rounded-lg border border-sky-200 bg-sky-50">
+                      <strong>🟦 Situation (상황):</strong> 당시의 근무 환경 및 직면했던 배경 객관적 서술
+                    </div>
+                    <div className="p-3 rounded-lg border border-amber-200 bg-amber-50">
+                      <strong>🟧 Task (과제/문제):</strong> 마주했던 난관, 해결해야 했던 핵심 문제점이나 목표
+                    </div>
+                    <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                      <strong>🟩 Action (주도적 행동 - 최고 배점):</strong> 수동적 지시 이행이 아닌, 본인이 능동적으로 취한 문제 해결 노력과 소통
+                    </div>
+                    <div className="p-3 rounded-lg border border-purple-200 bg-purple-50">
+                      <strong>🟪 Result (성과 및 교훈):</strong> 정량적 성과, 고객 감사, 조직 기여도 및 배운 점
+                    </div>
+                  </div>
+                </div>
+                <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                  <button onClick={() => setIsGuideModalOpen(false)} className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white">확인</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Saved Drafts Modal */}
+          {isSavedModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+              <div className="bg-white w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                  <h2 className="font-bold text-slate-900 text-base">내 자소서 보관함 ({savedDrafts.length}개)</h2>
+                  <div className="flex items-center gap-2">
+                    {savedDrafts.length > 0 && (
+                      <button onClick={handleExportAll} className="px-3 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:text-indigo-600">
+                        📥 전체 텍스트 내보내기
+                      </button>
+                    )}
+                    <button onClick={() => setIsSavedModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                  </div>
+                </div>
+                <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                  {savedDrafts.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 text-sm">보관함에 저장된 자소서가 없습니다.</div>
+                  ) : (
+                    savedDrafts.map((d) => (
+                      <div key={d.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-bold text-slate-900 text-sm">{d.headline}</h4>
+                          <button onClick={() => handleDeleteDraft(d.id)} className="text-xs text-rose-500 hover:underline">삭제</button>
+                        </div>
+                        <p className="text-xs sm:text-sm text-slate-700 bg-white p-3 rounded border border-slate-200 leading-relaxed whitespace-pre-wrap">{d.fullParagraph}</p>
+                        <div className="flex flex-wrap gap-1">
+                          {d.keywords.map((k, i) => (
+                            <span key={i} className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold border border-indigo-100">#{k.keyword}</span>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                  <button onClick={() => setIsSavedModalOpen(false)} className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-white">닫기</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
