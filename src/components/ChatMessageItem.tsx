@@ -8,6 +8,7 @@ interface ChatMessageItemProps {
   savedIds: string[];
   onSaveTranslation: (messageId: string) => void;
   onRefinePrompt: (promptText: string) => void;
+  onViewInRecords?: () => void;
 }
 
 export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
@@ -15,6 +16,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   savedIds,
   onSaveTranslation,
   onRefinePrompt,
+  onViewInRecords,
 }) => {
   const isUser = message.role === 'user';
   const isSaved = savedIds.includes(message.id);
@@ -55,6 +57,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             isSaved={isSaved}
             onSave={() => onSaveTranslation(message.id)}
             onRefinePrompt={onRefinePrompt}
+            onViewInRecords={onViewInRecords}
           />
         ) : (
           <div className="bg-white border border-slate-200/90 rounded-2xl rounded-tl-xs p-4 sm:p-5 shadow-xs text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">

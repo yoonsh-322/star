@@ -19,6 +19,7 @@ interface STARCardProps {
   isSaved?: boolean;
   onSave?: () => void;
   onRefinePrompt?: (promptText: string) => void;
+  onViewInRecords?: () => void;
 }
 
 export const STARCard: React.FC<STARCardProps> = ({
@@ -26,6 +27,7 @@ export const STARCard: React.FC<STARCardProps> = ({
   isSaved = false,
   onSave,
   onRefinePrompt,
+  onViewInRecords,
 }) => {
   const [copiedType, setCopiedType] = useState<'paragraph' | 'all' | null>(null);
   const [showSTARDetails, setShowSTARDetails] = useState<boolean>(true);
@@ -81,26 +83,36 @@ export const STARCard: React.FC<STARCardProps> = ({
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {onViewInRecords && (
+              <button
+                onClick={onViewInRecords}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 transition-colors"
+                title="STAR 기록 목록에서 모아보기"
+              >
+                <span>기록 탭에서 보기</span>
+              </button>
+            )}
+
             {onSave && (
               <button
                 onClick={onSave}
                 disabled={isSaved}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   isSaved
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                    : 'bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200'
+                    ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-default'
+                    : 'bg-slate-100 text-slate-700 hover:bg-amber-50 hover:text-amber-700 border border-slate-200'
                 }`}
                 title="보관함에 저장하기"
               >
                 {isSaved ? (
                   <>
-                    <BookmarkCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>저장됨</span>
+                    <BookmarkCheck className="w-3.5 h-3.5 text-amber-600" />
+                    <span>보관됨</span>
                   </>
                 ) : (
                   <>
                     <Bookmark className="w-3.5 h-3.5" />
-                    <span>보관함 저장</span>
+                    <span>보관함</span>
                   </>
                 )}
               </button>

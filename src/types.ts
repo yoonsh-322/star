@@ -27,7 +27,7 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export interface SavedDraft {
+export interface STARRecord {
   id: string;
   originalStory: string;
   headline: string;
@@ -35,5 +35,11 @@ export interface SavedDraft {
   fullParagraph: string;
   keywords: JobKeyword[];
   targetJob?: string;
-  savedAt: number;
+  tone?: string;
+  timestamp: number;
+  isBookmarked: boolean;
 }
+
+export type AppTab = 'chat' | 'records' | 'saved' | 'guide';
+
+export type SavedDraft = STARRecord;

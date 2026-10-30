@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { X, Bookmark, Trash2, Copy, Check, Download, ExternalLink } from 'lucide-react';
-import { SavedDraft } from '../types';
+import { X, Bookmark, Trash2, Copy, Check, Download } from 'lucide-react';
+import { STARRecord, JobKeyword } from '../types';
 
 interface SavedDraftsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  drafts: SavedDraft[];
+  drafts: STARRecord[];
   onDeleteDraft: (id: string) => void;
   onClearAll: () => void;
 }
@@ -21,8 +21,8 @@ export const SavedDraftsModal: React.FC<SavedDraftsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleCopyDraft = async (draft: SavedDraft) => {
-    const text = `${draft.headline}\n\n${draft.fullParagraph}\n\n[추천 직무 키워드]\n${draft.keywords.map((k) => `• ${k.keyword}: ${k.howToUse}`).join('\n')}`;
+  const handleCopyDraft = async (draft: STARRecord) => {
+    const text = `${draft.headline}\n\n${draft.fullParagraph}\n\n[추천 직무 키워드]\n${draft.keywords.map((k: JobKeyword) => `• ${k.keyword}: ${k.howToUse}`).join('\n')}`;
     await navigator.clipboard.writeText(text);
     setCopiedId(draft.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -32,8 +32,8 @@ export const SavedDraftsModal: React.FC<SavedDraftsModalProps> = ({
     if (drafts.length === 0) return;
     const content = drafts
       .map(
-        (d, idx) =>
-          `==========================================\n[자소서 #${idx + 1}] ${d.headline}\n작성일: ${new Date(d.savedAt).toLocaleDateString()}\n지원직무: ${d.targetJob || '일반'}\n\n[완성본]\n${d.fullParagraph}\n\n[STAR 단계별 분석]\n- 상황 (S): ${d.star.situation}\n- 과제 (T): ${d.star.task}\n- 행동 (A): ${d.star.action}\n- 결과 (R): ${d.star.result}\n\n[직무 키워드]\n${d.keywords.map((k) => `- ${k.keyword} (${k.howToUse})`).join('\n')}\n==========================================\n`
+        (d: STARRecord, idx: number) =>
+          `==========================================\n[자소서 #${idx + 1}] ${d.headline}\n작성일: ${new Date(d.timestamp).toLocaleDateString()}\n지원직무: ${d.targetJob || '일반'}\n\n[완성본]\n${d.fullParagraph}\n\n[STAR 단계별 분석]\n- 상황 (S): ${d.star.situation}\n- 과제 (T): ${d.star.task}\n- 행동 (A): ${d.star.action}\n- 결과 (R): ${d.star.result}\n\n[직무 키워드]\n${d.keywords.map((k: JobKeyword) => `- ${k.keyword} (${k.howToUse})`).join('\n')}\n==========================================\n`
       )
       .join('\n\n');
 
@@ -107,7 +107,7 @@ export const SavedDraftsModal: React.FC<SavedDraftsModalProps> = ({
                       {draft.targetJob || '일반'}
                     </span>
                     <span className="text-[11px] text-slate-400">
-                      {new Date(draft.savedAt).toLocaleDateString()}
+                      {new Date(draft.timestamp).toLocaleDateString()}
                     </span>
                     <h3 className="font-bold text-slate-900 text-sm sm:text-base mt-1">
                       {draft.headline}
@@ -142,7 +142,7 @@ export const SavedDraftsModal: React.FC<SavedDraftsModalProps> = ({
 
                 {/* Job Keywords */}
                 <div className="flex flex-wrap gap-1.5">
-                  {draft.keywords.map((kw, i) => (
+                  {draft.keywords.map((kw: JobKeyword, i: number) => (
                     <span
                       key={i}
                       className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md"

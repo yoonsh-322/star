@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Header } from './components/Header';
+import { AppTopBar } from './components/AppTopBar';
+import { BottomTabBar } from './components/BottomTabBar';
 import { ChatInput } from './components/ChatInput';
 import { ChatMessageItem } from './components/ChatMessageItem';
-import { SavedDraftsModal } from './components/SavedDraftsModal';
-import { GuideModal } from './components/GuideModal';
+import { STARRecordsView } from './components/STARRecordsView';
+import { SavedVaultView } from './components/SavedVaultView';
+import { GuideView } from './components/GuideView';
 import { SingleHtmlModal } from './components/SingleHtmlModal';
-import { ChatMessage, SavedDraft, TranslationData } from './types';
-import { Sparkles, MessageSquareHeart, AlertCircle } from 'lucide-react';
+import { ChatMessage, STARRecord, TranslationData, AppTab } from './types';
+import { Sparkles, MessageSquareHeart, AlertCircle, BookMarked, ArrowRight } from 'lucide-react';
 
 const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome-msg',
@@ -15,15 +17,26 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   timestamp: Date.now(),
 };
 
-const STORAGE_KEY = 'star_cover_letter_drafts_v1';
+const STORAGE_KEY_MESSAGES = 'star_chat_messages_v2';
+const STORAGE_KEY_RECORDS = 'star_cover_letter_records_v2';
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState<AppTab>('chat');
+
+  // Chat message stream
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    return [INITIAL_WELCOME_MESSAGE];
-  });
-  const [savedDrafts, setSavedDrafts] = useState<SavedDraft[]>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY_MESSAGES);
+      return stored ? JSON.parse(stored) : [INITIAL_WELCOME_MESSAGE];
+    } catch {
+      return [INITIAL_WELCOME_MESSAGE];
+    }
+  });
+
+  // Complete archive of STAR formatted records
+  const [starRecords, setStarRecords] = useState<STARRecord[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_RECORDS);
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -31,26 +44,34 @@ export default function App() {
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
-  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   const [isSingleHtmlModalOpen, setIsSingleHtmlModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Sync savedDrafts to localStorage
+  // Sync to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedDrafts));
+      localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
     } catch (e) {
-      console.error('Failed to save to localStorage:', e);
+      console.error('Failed to sync messages:', e);
     }
-  }, [savedDrafts]);
+  }, [messages]);
 
-  // Scroll to bottom on message update
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    try {
+      localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(starRecords));
+    } catch (e) {
+      console.error('Failed to sync records:', e);
+    }
+  }, [starRecords]);
+
+  // Scroll to bottom on message update when in chat tab
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isLoading, activeTab]);
 
   const handleSendMessage = async (
     text: string,
@@ -73,7 +94,6 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      // Build lightweight history context
       const historyContext = messages
         .filter((m) => m.id !== 'welcome-msg')
         .slice(-6)
@@ -113,6 +133,22 @@ export default function App() {
       };
 
       setMessages((prev) => [...prev, newBotMsg]);
+
+      // Automatically archive this translated STAR response into STAR records!
+      const newRecord: STARRecord = {
+        id: `rec-${Date.now()}`,
+        originalStory: text,
+        headline: translationData.headline,
+        star: translationData.star,
+        fullParagraph: translationData.fullParagraph,
+        keywords: translationData.keywords,
+        targetJob,
+        tone,
+        timestamp: Date.now(),
+        isBookmarked: false,
+      };
+
+      setStarRecords((prev) => [newRecord, ...prev]);
     } catch (err: any) {
       console.error('Error translating story:', err);
       setErrorMessage(
@@ -123,155 +159,207 @@ export default function App() {
     }
   };
 
-  const handleSaveTranslation = (messageId: string) => {
-    const msg = messages.find((m) => m.id === messageId);
+  const handleToggleBookmark = (idOrMessageId: string) => {
+    // Check if it's a starRecord id
+    const foundRecord = starRecords.find((r) => r.id === idOrMessageId);
+    if (foundRecord) {
+      setStarRecords((prev) =>
+        prev.map((r) => (r.id === idOrMessageId ? { ...r, isBookmarked: !r.isBookmarked } : r))
+      );
+      return;
+    }
+
+    // Check if it's from chat message id
+    const msg = messages.find((m) => m.id === idOrMessageId);
     if (!msg || !msg.translation) return;
 
-    // Find original user prompt if available
-    const msgIndex = messages.findIndex((m) => m.id === messageId);
-    let originalStory = '';
-    if (msgIndex > 0 && messages[msgIndex - 1].role === 'user') {
-      originalStory = messages[msgIndex - 1].content;
+    // Find if already exists in starRecords by headline
+    const existing = starRecords.find((r) => r.headline === msg.translation?.headline);
+    if (existing) {
+      setStarRecords((prev) =>
+        prev.map((r) => (r.id === existing.id ? { ...r, isBookmarked: !r.isBookmarked } : r))
+      );
+    } else {
+      // Add as bookmarked record
+      const newRecord: STARRecord = {
+        id: `rec-${Date.now()}`,
+        originalStory: '',
+        headline: msg.translation.headline,
+        star: msg.translation.star,
+        fullParagraph: msg.translation.fullParagraph,
+        keywords: msg.translation.keywords,
+        timestamp: Date.now(),
+        isBookmarked: true,
+      };
+      setStarRecords((prev) => [newRecord, ...prev]);
     }
-
-    const newDraft: SavedDraft = {
-      id: `draft-${Date.now()}`,
-      originalStory,
-      headline: msg.translation.headline,
-      star: msg.translation.star,
-      fullParagraph: msg.translation.fullParagraph,
-      keywords: msg.translation.keywords,
-      savedAt: Date.now(),
-    };
-
-    setSavedDrafts((prev) => [newDraft, ...prev]);
   };
 
-  const handleDeleteDraft = (id: string) => {
-    setSavedDrafts((prev) => prev.filter((d) => d.id !== id));
+  const handleDeleteRecord = (id: string) => {
+    setStarRecords((prev) => prev.filter((r) => r.id !== id));
   };
 
-  const handleClearAllDrafts = () => {
-    if (window.confirm('저장된 보관함의 모든 자소서를 삭제하시겠습니까?')) {
-      setSavedDrafts([]);
-    }
+  const handleSelectRecordForChat = (record: STARRecord) => {
+    setActiveTab('chat');
+    // Pre-prompt follow-up
+    handleSendMessage(
+      `이전에 작성했던 [${record.headline}] 자소서를 바탕으로 조금 더 역량을 부각시키고 싶은데, 어떤 방향으로 수정하면 좋을지 피드백해줘.`
+    );
   };
 
   const handleResetChat = () => {
     if (
       messages.length <= 1 ||
-      window.confirm('대화 내용을 초기화하고 새로운 경험을 번역하시겠습니까?')
+      window.confirm('채팅 대화 내용을 초기화하시겠습니까? (STAR 자소서 기록은 안전하게 보존됩니다)')
     ) {
       setMessages([INITIAL_WELCOME_MESSAGE]);
       setErrorMessage(null);
     }
   };
 
-  // Determine saved message ids
-  const savedHeadlines = new Set(savedDrafts.map((d) => d.headline));
-  const savedMessageIds = messages
-    .filter((m) => m.translation && savedHeadlines.has(m.translation.headline))
+  const savedRecords = starRecords.filter((r) => r.isBookmarked);
+  const bookmarkedHeadlines = new Set(savedRecords.map((r) => r.headline));
+  const bookmarkedMessageIds = messages
+    .filter((m) => m.translation && bookmarkedHeadlines.has(m.translation.headline))
     .map((m) => m.id);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
-      {/* Top Header */}
-      <Header
-        savedCount={savedDrafts.length}
-        onOpenSaved={() => setIsSavedModalOpen(true)}
-        onOpenGuide={() => setIsGuideModalOpen(true)}
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-indigo-100 selection:text-indigo-900">
+      {/* App Top Bar */}
+      <AppTopBar
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab)}
+        recordCount={starRecords.length}
+        savedCount={savedRecords.length}
         onOpenSingleHtml={() => setIsSingleHtmlModalOpen(true)}
         onResetChat={handleResetChat}
       />
 
-      {/* Main Chat Area */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-4 sm:py-6">
-        {/* Intro Banner for Job Seekers */}
-        <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-sky-500/10 to-indigo-500/5 border border-indigo-200/60 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-              <MessageSquareHeart className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs sm:text-sm font-bold text-slate-800">
-                &quot;오늘 하루 어떤 경험을 하셨나요?&quot;
-              </p>
-              <p className="text-xs text-slate-500">
-                아무리 사소해 보이는 일도 채용 담당자에게는 소중한 문제해결 역량이 됩니다.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setIsGuideModalOpen(true)}
-            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 shrink-0 underline underline-offset-2 hidden sm:block"
-          >
-            STAR 작성 팁 보기
-          </button>
-        </div>
-
-        {/* Messages Stream */}
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <ChatMessageItem
-              key={message.id}
-              message={message}
-              savedIds={savedMessageIds}
-              onSaveTranslation={handleSaveTranslation}
-              onRefinePrompt={(refineText) => handleSendMessage(refineText)}
-            />
-          ))}
-
-          {/* Loading Indicator */}
-          {isLoading && (
-            <div className="flex gap-2.5 max-w-4xl mx-auto my-4 animate-in fade-in">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-sky-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Sparkles className="w-4 h-4 animate-spin" />
-              </div>
-              <div className="bg-white border border-slate-200/90 rounded-2xl rounded-tl-xs p-4 sm:p-5 shadow-xs max-w-md">
-                <div className="flex items-center gap-2 text-xs font-semibold text-indigo-700 mb-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span>
-                  경험을 STAR 기법과 직무 키워드로 번역하고 있어요...
+      {/* Main Dynamic View */}
+      {activeTab === 'chat' && (
+        <div className="flex-1 flex flex-col justify-between">
+          <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-4 sm:py-6 pb-20 md:pb-6">
+            {/* Intro Career App Banner */}
+            <div className="mb-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <MessageSquareHeart className="w-5 h-5" />
                 </div>
-                <div className="space-y-2">
-                  <div className="h-3 bg-slate-100 rounded-full w-4/5 animate-pulse"></div>
-                  <div className="h-3 bg-slate-100 rounded-full w-full animate-pulse"></div>
-                  <div className="h-3 bg-slate-100 rounded-full w-3/5 animate-pulse"></div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    &quot;오늘 하루 어떤 경험을 하셨나요?&quot;
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    소소한 알바 일기나 일상을 적으면 실시간으로 STAR 자소서로 번역됩니다.
+                  </p>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Error Message */}
-          {errorMessage && (
-            <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-start gap-2.5 my-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">번역 요청에 실패했습니다</p>
-                <p className="text-xs text-rose-600 mt-0.5">{errorMessage}</p>
-              </div>
+              {starRecords.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('records')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/70 border border-indigo-200/60 transition-colors self-start sm:self-auto"
+                >
+                  <BookMarked className="w-3.5 h-3.5" />
+                  <span>내 STAR 기록 {starRecords.length}건 모아보기</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-          )}
 
-          <div ref={messagesEndRef} />
+            {/* Chat Stream */}
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <ChatMessageItem
+                  key={message.id}
+                  message={message}
+                  savedIds={bookmarkedMessageIds}
+                  onSaveTranslation={handleToggleBookmark}
+                  onRefinePrompt={(refineText) => handleSendMessage(refineText)}
+                  onViewInRecords={() => setActiveTab('records')}
+                />
+              ))}
+
+              {/* Loading Indicator */}
+              {isLoading && (
+                <div className="flex gap-2.5 max-w-4xl mx-auto my-4 animate-in fade-in">
+                  <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Sparkles className="w-4 h-4 animate-spin text-indigo-400" />
+                  </div>
+                  <div className="bg-white border border-slate-200/90 rounded-2xl rounded-tl-xs p-4 sm:p-5 shadow-xs max-w-md">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-indigo-700 mb-2">
+                      <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span>
+                      경험을 STAR 구조와 직무 역량으로 번역하고 있어요...
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-3 bg-slate-100 rounded-full w-4/5 animate-pulse"></div>
+                      <div className="h-3 bg-slate-100 rounded-full w-full animate-pulse"></div>
+                      <div className="h-3 bg-slate-100 rounded-full w-3/5 animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {errorMessage && (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-start gap-2.5 my-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">번역 요청에 실패했습니다</p>
+                    <p className="text-xs text-rose-600 mt-0.5">{errorMessage}</p>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </main>
+
+          {/* Bottom Chat Input Form */}
+          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
         </div>
-      </main>
+      )}
 
-      {/* Input Form at Bottom */}
-      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+      {/* STAR Records View */}
+      {activeTab === 'records' && (
+        <main className="flex-1">
+          <STARRecordsView
+            records={starRecords}
+            onToggleBookmark={handleToggleBookmark}
+            onDeleteRecord={handleDeleteRecord}
+            onSelectForChat={handleSelectRecordForChat}
+            onGoToChat={() => setActiveTab('chat')}
+          />
+        </main>
+      )}
 
-      {/* Saved Drafts Modal */}
-      <SavedDraftsModal
-        isOpen={isSavedModalOpen}
-        onClose={() => setIsSavedModalOpen(false)}
-        drafts={savedDrafts}
-        onDeleteDraft={handleDeleteDraft}
-        onClearAll={handleClearAllDrafts}
+      {/* Saved Bookmarks View */}
+      {activeTab === 'saved' && (
+        <main className="flex-1">
+          <SavedVaultView
+            savedRecords={savedRecords}
+            onToggleBookmark={handleToggleBookmark}
+            onGoToChat={() => setActiveTab('chat')}
+          />
+        </main>
+      )}
+
+      {/* Guide & Education View */}
+      {activeTab === 'guide' && (
+        <main className="flex-1">
+          <GuideView onGoToChat={() => setActiveTab('chat')} />
+        </main>
+      )}
+
+      {/* App Mobile Bottom Tab Bar */}
+      <BottomTabBar
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab)}
+        recordCount={starRecords.length}
+        savedCount={savedRecords.length}
       />
 
-      {/* STAR Guide Modal */}
-      <GuideModal isOpen={isGuideModalOpen} onClose={() => setIsGuideModalOpen(false)} />
-
-      {/* Single HTML Modal */}
+      {/* Single HTML Code & Download Modal */}
       <SingleHtmlModal
         isOpen={isSingleHtmlModalOpen}
         onClose={() => setIsSingleHtmlModalOpen(false)}
